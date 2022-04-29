@@ -13,16 +13,17 @@
 #include <immintrin.h>
 
 
+
 // string ////////////////////////////////////////////////////////////////////////////////////
 
 #define	dalib_str_realloc(str, newsize)	\
 	(str = realloc(str, sizeof(char) * newsize))
 
 #define dalib_str_free(str)	\
-	(str = realloc(str, sizeof str), free(str), str = NULL)
+	(str = dalib_str_realloc(str, sizeof str), free(str), str = NULL)
 
-#define	dalib_str_assign(str, val)	\
-	(str = malloc(strlen(val)), memcpy(str, val, sizeof val))
+#define	dalib_str_alloc_assign(str, val)	\
+	(str = malloc(dalib_str_length(val)), memcpy(str, val, sizeof val))
 
 #define	dalib_str_copy(str, other)	\
 	(	\
@@ -32,7 +33,7 @@
 	)
 
 #define dalib_str_index_outofbound(str, idx)	\
-	((idx < 0) | (idx > strlen(str) - 1))
+	((idx < 0) | (idx > dalib_str_length(str) - 1))
 
 #define	dalib_str_at(str, idx)	\
 	(dalib_str_index_outofbound(str, idx) ? '\0' : str[idx])
@@ -63,82 +64,83 @@
 	(dalib_str_length(str) == 0)
 
 #define	dalib_str_null_terminate(str, idx)	\
-	(str[idx] = '\0')
+	(*(str + idx) = '\0')
 
 bool dalib_str_insert_with_range
-(char *str, size_t pos, const char *other, size_t range)
+(char **str, size_t pos, const char *other, size_t range)
 {
-	if (!str || !other)
+	if (!(*str) || !other)
 		return false;
 
-	pos = (pos > dalib_str_length(str)) ? dalib_str_length(str) : pos;
+	pos = (pos > dalib_str_length((*str))) ? dalib_str_length((*str)) : pos;
 	range = (range > dalib_str_length(other)) ? dalib_str_length(other) : range;
 
-	size_t	lenstr = dalib_str_length(str),
-		lenother = range;
+	size_t	lenstr = dalib_str_length((*str)),
+		lenother = range,
+		newsz = lenstr + lenother + 1;
 
-	str = dalib_str_realloc(str, lenstr + lenother + 1);
-	memmove(str + pos + lenother, str + pos, lenstr - pos + 1);
-	memcpy(str + pos, other, lenother);
-	dalib_str_null_terminate(str, lenstr + lenother);
+	(*str) = dalib_str_realloc((*str), lenstr + lenother + 1);
+	memmove((*str) + pos + lenother, (*str) + pos, lenstr - pos + 1);
+	memcpy((*str) + pos, other, lenother);
+	dalib_str_null_terminate((*str), lenstr + lenother);
 
 	return true;
 }
 
 #define	dalib_str_insert(str, pos, other)	\
-	(dalib_str_insert_with_range(str, pos, other, dalib_str_length(other)))
+	(dalib_str_insert_with_range(&str, pos, other, dalib_str_length(other)))
 
 #define dalib_str_append(str, other)	\
-	(dalib_str_insert_with_range(str, dalib_str_length(str), other, dalib_str_length(other)))
+	(dalib_str_insert_with_range(&str, dalib_str_length(str), other, dalib_str_length(other)))
 
 #define dalib_str_append_with_range(str, other, range)	\
-	(dalib_str_insert_with_range(str, dalib_str_length(str), other, range))
+	(dalib_str_insert_with_range(&str, dalib_str_length(str), other, range))
 
 bool dalib_str_insert_other_from_pos_with_range
-(char *str, size_t pos, const char *other, size_t other_pos, size_t range)
+(char **str, size_t pos, const char *other, size_t other_pos, size_t range)
 {
-	if (!str || !other)
+	if (!(*str) || !other)
 		return false;
 
-	pos = (pos > dalib_str_length(str)) ? dalib_str_length(str) : pos;
+	pos = (pos > dalib_str_length((*str))) ? dalib_str_length((*str)) : pos;
 	other_pos = (other_pos > dalib_str_length(other)) ? dalib_str_length(other) : other_pos;
 	range = (range > dalib_str_length(other) - other_pos) ? dalib_str_length(other) - other_pos : range;
 
-	size_t	lenstr = dalib_str_length(str),
+	size_t	lenstr = dalib_str_length((*str)),
 		lenother = range;
 
-	str = dalib_str_realloc(str, lenstr + lenother + 1);
-	memmove(str + pos + lenother, str + pos, lenstr - pos + 1);
-	memcpy(str + pos, other + other_pos, lenother);
-	dalib_str_null_terminate(str, lenstr + lenother);
+	(*str) = dalib_str_realloc((*str), lenstr + lenother + 1);
+	memmove((*str) + pos + lenother, (*str) + pos, lenstr - pos + 1);
+	memcpy((*str) + pos, other + other_pos, lenother);
+	dalib_str_null_terminate((*str), lenstr + lenother);
 
 	return true;
 }
 
 #define	dalib_str_insert_other_from_pos(str, pos, other, other_pos)	\
-	(dalib_str_insert_other_from_pos_with_range(str, pos, other, other_pos, dalib_str_length(other) - other_pos))
+	(dalib_str_insert_other_from_pos_with_range(&str, pos, other, other_pos, dalib_str_length(other) - other_pos))
 
 bool dalib_str_erase_with_range
-(char *str, size_t pos, size_t range)
+(char **str, size_t pos, size_t range)
 {
-	if (!str)	return false;
+	if (!(*str))	return false;
 
-	pos = (pos > dalib_str_length(str)) ? dalib_str_length(str) : pos;
-	range = (range > dalib_str_length(str) - pos) ? dalib_str_length(str) - pos : range;
+	pos = (pos > dalib_str_length((*str))) ? dalib_str_length((*str)) : pos;
+	range = (range > dalib_str_length((*str)) - pos) ? dalib_str_length((*str)) - pos : range;
 
-	size_t	lenremain = dalib_str_length(str) - pos - range,
+	size_t	lenremain = dalib_str_length((*str)) - pos - range,
 		posremain = pos + range;
-	char ch = str[posremain];
+	char ch = (*str)[posremain];
 
-	memmove(str + pos, str + posremain, lenremain);
-	dalib_str_realloc(str, pos + lenremain + 1);
-	dalib_str_null_terminate(str, pos + lenremain);
+	memmove((*str) + pos, (*str) + posremain, lenremain);
+	dalib_str_realloc((*str), pos + lenremain + 1);
+	dalib_str_null_terminate((*str), pos + lenremain);
 
 	return true;
 }
 
 #define	dalib_str_erase(str, pos)	\
-	(dalib_str_erase_with_range(str, pos, dalib_str_length(str) - pos))
+	(dalib_str_erase_with_range(&str, pos, dalib_str_length(str) - pos))
 
 bool dalib_str_replace_char_range
 (char *str, size_t pos, char ch, size_t range)
@@ -290,6 +292,163 @@ int dalib_str_find_last
 	for (; ptr = strstr(ptr, substr); foundidx = ptr - str, ptr += lensubstr);
 	return foundidx;
 }
+
+bool dalib_str_remove_whitespace
+(char *str) 
+{
+	if (!str)	return false;
+
+	char	*w = str,
+		*r = str;
+
+	do
+		if (*r != ' ')
+			*w++ = *r;
+	while (*r++);
+
+	return true;
+}
+
+
+// stack /////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct s_dalib_stack_type {
+
+	void		*_ptr;
+	const char	*_t_nm;
+
+	size_t		_elem_sz;
+	size_t		_sz;
+	size_t		_cap;
+
+}
+dalib_stack_t;
+
+
+dalib_stack_t dalib_stack_new
+(const char *element_type, const size_t element_size, const size_t capacity)
+{
+	dalib_stack_t newstack;
+	newstack._ptr = malloc(element_size * capacity);
+	newstack._t_nm = element_type;
+	newstack._elem_sz = element_size;
+	newstack._sz = 0;
+	newstack._cap = capacity;
+
+	return newstack;
+}
+
+#define dalib_stack_new(type, capacity)	\
+	(dalib_stack_new(#type, sizeof(type), capacity))
+
+dalib_stack_t dalib_stack_assign
+(void **stack_ptr, const char *element_type, const size_t element_size, const size_t capacity)
+{
+	if (!(*stack_ptr))
+		*stack_ptr = malloc(element_size * capacity);
+	else {
+		void *newptr = realloc(*stack_ptr, element_size * capacity);
+		*stack_ptr = (!newptr) ? *stack_ptr : newptr;
+	}
+
+	dalib_stack_t newstack;
+	newstack._ptr = *stack_ptr;
+	newstack._t_nm = element_type;
+	newstack._elem_sz = element_size;
+	newstack._sz = 0;
+	newstack._cap = capacity;
+
+	return newstack;
+}
+
+#define dalib_stack_assign(stack_ptr, type, capacity)	\
+	(dalib_stack_assign(&stack_ptr, #type, sizeof(type), capacity))
+
+#define	dalib_stack_free(stack)	\
+	((stack)->_t_nm = NULL, free((stack)->_ptr))
+
+#define	dalib_stack_get_data(stack, type)	\
+	((type *)(stack)->_ptr)
+
+#define dalib_stack_get_type(stack)	\
+	((stack)->_t_nm)
+
+#define dalib_stack_get_element_size(stack)	\
+	((stack)->_elem_sz)
+
+#define dalib_stack_get_size(stack)	\
+	((stack)->_sz)
+
+#define	dalib_stack_get_capacity(stack)	\
+	((stack)->_cap)
+
+bool dalib_stack_grow
+(dalib_stack_t *stack)
+{
+	if (!stack)	return false;
+
+	stack->_cap = (stack->_cap * 2) + ((stack->_cap == 0) ? 1 : 0);
+
+	void *newptr = realloc(stack->_ptr, stack->_elem_sz * stack->_cap);
+	stack->_ptr = (!newptr) ? stack->_ptr : newptr;
+
+	return true;
+}
+
+#define	dalib_stack_grow(stack)	\
+	(dalib_stack_grow(stack))
+
+#define	dalib_stack_is_empty(stack)	\
+	((!(stack)) | ((stack)->_sz == 0))
+
+#define	dalib_stack_push_back(stack, type, value)	\
+	{	\
+		if ((((stack) != NULL) && dalib_str_equal((stack)->_t_nm, #type))) {	\
+			if ((stack)->_sz >= (stack)->_cap) {	\
+				dalib_stack_grow((stack));	\
+			}	\
+				\
+			type newval = value;	\
+			*((type*)(stack)->_ptr + (stack)->_sz++) = newval;	\
+		}	\
+	}
+
+#define dalib_stack_pop_back(stack)	\
+	{	\
+		if (((stack) != NULL) && !dalib_stack_is_empty(stack)) {	\
+			(stack)->_sz--;	\
+		}	\
+	}
+
+#define	dalib_stack_at(stack, type, pos)	\
+	(	\
+		(((stack) != NULL) && dalib_str_equal((stack)->_t_nm, #type) && !dalib_stack_is_empty((stack)))	\
+		?	*((type *)(stack)->_ptr + ((pos < 0 ? 0 : pos >= dalib_stack_get_size(stack) ? dalib_stack_get_size(stack) - 1 : pos)))	\
+		:	(type){0}	\
+	)
+
+#define	dalib_stack_peek(stack, type)	\
+	(dalib_stack_at(stack, type, dalib_stack_get_size(stack) - 1))
+
+#define	dalib_stack_reverse(stack, type)	\
+	{	\
+		if (((stack) != NULL) && !dalib_stack_is_empty(stack) && dalib_str_equal((stack)->_t_nm, #type)) {	\
+			type	*front = (type *)(stack)->_ptr;	\
+			type	*back = (type *)(stack)->_ptr + (stack)->_sz - 1;	\
+				\
+			for (; front < back; ++front, --back) {	\
+				type temp = *front;	\
+				*front = *back;	\
+				*back = temp;	\
+			}	\
+		}	\
+	}
+
+#define	dalib_stack_get_front(stack, type)	\
+	((type *)(stack)->_ptr)
+
+#define	dalib_stack_get_back(stack, type)	\
+	((type *)(stack)->_ptr + dalib_stack_get_size(stack) - 1)
 
 
 
