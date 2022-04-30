@@ -1,6 +1,6 @@
 # dalib
-header-only **d**ata structure and **a**lgorithm **lib**rary
+header-only <ins>d</ins>ata structure and <ins>a</ins>lgorithm <ins>lib</ins>rary
 
-##features:
+## features:
 - string operations
 - stack operations
