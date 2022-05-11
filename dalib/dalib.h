@@ -447,8 +447,7 @@ bool _dalib_helper_stack_is_empty
 			stack = _dalib_helper_stack_grow(stack);	\
 		}	\
 		header = (dalib_stack_header_t *)((intptr_t *)stack - _dalib_helper_stack_header_length); \
-		type val = ##__VA_ARGS__;	\
-		*(type *)(stack + header->length++) = val;	\
+		*(type *)(stack + header->length++) = (type)##__VA_ARGS__;	\
 	}
 
 #define	dalib_stack_pop(stack)	\
@@ -474,8 +473,13 @@ bool _dalib_helper_stack_is_empty
 #define	dalib_stack_get_capacity(stack)	\
 	(_dalib_helper_stack_get_header(stack)->capacity)
 
-#define	dalib_stack_peek(stack, type)	\
-	(*((type *)stack + _dalib_helper_stack_get_header(stack)->length - 1))
+#define	dalib_stack_peek(stack)	\
+	(*(stack + _dalib_helper_stack_get_header(stack)->length - 1))
+
+#define	dalib_stack_begin(stack)	(stack)
+
+#define	dalib_stack_end(stack)	\
+	(stack + _dalib_helper_stack_get_header(stack)->length)
 
 #define	dalib_stack_reverse(stack, type)	\
 	{	\
@@ -620,8 +624,7 @@ bool _dalib_helper_queue_is_empty
 			queue = _dalib_helper_queue_grow(queue);	\
 		}	\
 		header = (dalib_queue_header_t *)((intptr_t *)queue - _dalib_helper_queue_header_length); \
-		type val = ##__VA_ARGS__;	\
-		*(type *)(queue + header->length++) = val;	\
+		*(type *)(queue + header->length++) = (type)##__VA_ARGS__;	\
 	}
 
 #define	dalib_queue_pop(queue)	\
@@ -648,11 +651,15 @@ bool _dalib_helper_queue_is_empty
 #define	dalib_queue_get_capacity(queue)	\
 	(_dalib_helper_queue_get_header(queue)->capacity)
 
-#define	dalib_queue_get_front(queue, type)	\
-	(*(type *)(queue))
+#define	dalib_queue_get_front(queue)	(*queue)
 
-#define	dalib_queue_get_back(queue, type)	\
-	(*(type *)(queue + _dalib_helper_queue_get_header(queue)->length - 1))
+#define	dalib_queue_get_back(queue)	\
+	(*(queue + _dalib_helper_queue_get_header(queue)->length - 1))
+
+#define	dalib_queue_begin(queue)	(queue)
+
+#define	dalib_queue_end(queue)	\
+	(queue + _dalib_helper_queue_get_header(queue)->length)
 
 #define	dalib_queue_reverse(queue, type)	\
 	{	\
@@ -684,6 +691,275 @@ bool _dalib_helper_queue_is_empty
 				queue = other_queue;	\
 				other_queue = temp;	\
 			}	\
+		}	\
+	}
+
+
+
+// list //////////////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct s_dalib_list_header_type {
+
+	char		*type_name;
+
+	size_t		elem_size;
+	size_t		length;
+	size_t		capacity;
+
+}
+dalib_list_header_t;
+
+
+// -- helper -- //
+
+const size_t _dalib_helper_list_header_length = 4;
+const size_t _dalib_helper_list_growth_factor = 2;
+
+void *_dalib_helper_list_new
+(const size_t elem_size, const char *type_name, const size_t capacity)
+{
+	size_t	headersz = sizeof(dalib_list_header_t),
+		listsz = elem_size * capacity;
+
+	intptr_t *newls = malloc(headersz + listsz);
+	memset(newls, 0, headersz + listsz);
+
+	dalib_list_header_t *header = (dalib_list_header_t *)newls;
+	header->type_name = malloc(strlen(type_name));
+	strcpy(header->type_name, type_name);
+	header->elem_size = elem_size;
+	header->length = 0;
+	header->capacity = capacity;
+
+	return (void *)(newls + _dalib_helper_list_header_length);
+}
+
+bool _dalib_helper_list_free
+(void **list)
+{
+	if (!(*list))	return false;
+
+	dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)(*list) - _dalib_helper_list_header_length);
+	free(header);
+
+	return true;
+}
+
+void *_dalib_helper_list_grow
+(void *list)
+{
+	if (!list)	return false;
+
+	dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);
+	header->capacity *= _dalib_helper_list_growth_factor;
+	header->capacity += (header->capacity == 0);
+
+	void *newls = _dalib_helper_list_new(header->elem_size, header->type_name, header->capacity);
+	memcpy(newls, list, header->elem_size * header->capacity);
+
+	dalib_list_header_t *newheader = (dalib_list_header_t *)((intptr_t *)newls - _dalib_helper_list_header_length);
+	newheader->length = header->length;
+
+	free(header);
+	return newls;
+}
+
+dalib_list_header_t *_dalib_helper_list_get_header
+(const void *list)
+{
+	if (!list)
+		return NULL;
+	else
+		return (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);
+}
+
+bool _dalib_helper_list_is_empty
+(const void *list)
+{
+	if (!list)	return false;
+
+	dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);
+	return (header->length == 0);
+}
+
+
+// -- public -- //
+
+#define	dalib_list_new(type)	\
+	(_dalib_helper_list_new(sizeof(type), #type, 10))
+
+#define	dalib_list_new_reserve_capacity(type, capacity)	\
+	(_dalib_helper_list_new(sizeof(type), #type, capacity))
+
+#define	dalib_list_free(list)	\
+	(_dalib_helper_list_free(&list))
+
+#define	dalib_list_is_empty(list)	\
+	(_dalib_helper_list_is_empty(list))
+
+#define	dalib_list_push_back(list, type, ...)	\
+	{	\
+		dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+		if (header->length >= header->capacity) {	\
+			list = _dalib_helper_list_grow(list);	\
+		}	\
+		header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+		*(type *)(list + header->length++) = (type)##__VA_ARGS__;	\
+	}
+
+#define	dalib_list_pop_back(list, type, ...)	\
+	{	\
+		dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+		if (header->length > 0) {	\
+			header->length--;	\
+		}	\
+	}
+
+#define	dalib_list_push_front(list, type, ...)	\
+	{	\
+		dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+		if (header->length >= header->capacity) {	\
+			list = _dalib_helper_list_grow(list);	\
+		}	\
+		header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+		memcpy(list + 1, list, header->elem_size * header->length);	\
+		*(type *)list = (type)##__VA_ARGS__;	\
+		header->length++;	\
+	}
+
+#define	dalib_list_insert(list, pos, type, ...)	\
+	{	\
+		dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+		if ((pos) >= 0 && (pos) < header->length) {	\
+			if (header->length >= header->capacity) {	\
+				list = _dalib_helper_list_grow(list);	\
+			}	\
+			header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+			memcpy(list + (pos) + 1, list + (pos), header->elem_size * (header->length - (pos)));	\
+			*(type *)(list + (pos)) = (type)##__VA_ARGS__;	\
+			header->length++;	\
+		}	\
+	}
+
+#define	dalib_list_pop_front(list, type, ...)	\
+	{	\
+		dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);	\
+		if (header->length > 0) {	\
+			memcpy(list, list + 1, header->elem_size * (header->length - 1));	\
+			header->length--;	\
+		}	\
+	}
+
+#define	dalib_list_erase(list, pos)	\
+	{	\
+		dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);	\
+		if ((pos) >= 0 && (pos) < header->length) {	\
+			if (header->length > 0) {	\
+				memcpy(list + (pos), list + (pos) + 1, header->elem_size * (header->length - (pos) - 1));	\
+				header->length--;	\
+			}	\
+		}	\
+	}
+
+#define	dalib_list_assign(list, num, type, ...)	\
+	for (size_t i = 0; i < num; ++i) {	\
+		dalib_list_push_back(list, type, ##__VA_ARGS__); \
+	}
+
+#define	dalib_list_clear(list)	\
+	(_dalib_helper_list_get_header(list)->length = 0)
+
+#define	dalib_list_get_header(list)	\
+	(_dalib_helper_list_get_header(list))
+
+#define	dalib_list_get_type_name(list)	\
+	(_dalib_helper_list_get_header(list)->type_name)
+
+#define	dalib_list_get_element_size(list)	\
+	(_dalib_helper_list_get_header(list)->elem_size)
+
+#define	dalib_list_get_length(list)	\
+	(_dalib_helper_list_get_header(list)->length)
+
+#define	dalib_list_get_capacity(list)	\
+	(_dalib_helper_list_get_header(list)->capacity)
+
+#define	dalib_list_get_front(list)	(*list)
+
+#define	dalib_list_get_back(list)	\
+	(*(list + _dalib_helper_list_get_header(list)->length - 1))
+
+#define	dalib_list_begin(list)	(list)
+
+#define	dalib_list_end(list)	\
+	(list + _dalib_helper_list_get_header(list)->length)
+
+#define	dalib_list_reverse(list, type)	\
+	{	\
+		if (list && !_dalib_helper_list_is_empty(list)) {	\
+			dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+			type *front = (type *)list;	\
+			type *back = front + header->length - 1;	\
+				\
+			for (; front < back; ++front, --back) {	\
+				type temp = *front;	\
+				*front = *back;	\
+				*back = temp;	\
+			}	\
+		}	\
+	}
+
+#define	dalib_list_swap(list, other_list)	\
+	{	\
+		if (list && other_list) {	\
+			dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+			dalib_list_header_t *otherheader = (dalib_list_header_t *)((intptr_t *)other_list - _dalib_helper_list_header_length); \
+			{	\
+				dalib_list_header_t *temp = header;	\
+				header = otherheader;	\
+				otherheader = temp;	\
+			}	\
+			{	\
+				void *temp = list;	\
+				list = other_list;	\
+				other_list = temp;	\
+			}	\
+		}	\
+	}
+
+#define	dalib_list_merge(list, other_list)	\
+	{	\
+		if (list && other_list) {	\
+			dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+			dalib_list_header_t *otherheader = (dalib_list_header_t *)((intptr_t *)other_list - _dalib_helper_list_header_length); \
+			size_t len = header->length;	\
+			header->length += otherheader->length;	\
+			while (_dalib_helper_list_get_header(list)->length >= header->capacity) {	\
+				list = _dalib_helper_list_grow(list); \
+			}	\
+			header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);	\
+			memcpy(list + len, other_list, header->elem_size * otherheader->length);	\
+		}	\
+	}
+
+#define	dalib_list_splice(list, pos, other_list, begin, end)	\
+	{	\
+		if (list && other_list && (pos) >= 0 && (pos) < _dalib_helper_list_get_header(list)->length) {	\
+			dalib_list_header_t *header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length); \
+			dalib_list_header_t *otherheader = (dalib_list_header_t *)((intptr_t *)other_list - _dalib_helper_list_header_length); \
+			size_t b = begin, e = end;	\
+			if (b > e) {	\
+				size_t temp = b;	\
+				b = e; \
+				e = temp; \
+			}	\
+			header->length += (e - b);	\
+			while (_dalib_helper_list_get_header(list)->length >= header->capacity) {	\
+				list = _dalib_helper_list_grow(list); \
+			}	\
+			header = (dalib_list_header_t *)((intptr_t *)list - _dalib_helper_list_header_length);	\
+			memcpy(list + (pos) + (e - b), ls + (pos), header->elem_size * (header->length - (e - b)));	\
+			memcpy(list + (pos), other_list + b, header->elem_size * (e - b));	\
 		}	\
 	}
 

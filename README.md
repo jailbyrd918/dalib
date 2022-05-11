@@ -5,3 +5,4 @@ header-only <ins>d</ins>ata structure and <ins>a</ins>lgorithm <ins>lib</ins>rar
 - string operations
 - stack operations
 - queue operations
+- list operations
